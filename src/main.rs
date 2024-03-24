@@ -80,15 +80,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     //println!("{:?}", stars);
 
 
-    let mut constellations = HashMap::new();
 
-    for i in 0..stars.len() {
-        for j in i+1..stars.len() {
-            let distance = calculate_distance(&stars[i], &stars[j]);
-            constellations.insert((stars[i].hr, stars[j].hr), distance);
-        }
-    }
-
+    let mut star_fingure_prints = HashMap::new();
     //for each star in stars find the 5 shortest constellations
     for i in 0..stars.len() {
         let mut shortest_constellations = HashMap::new();
@@ -114,6 +107,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
         println!("Star: {}, Constellations: {:?}", stars[i].hr, shortest_constellations);
+        // Sum the distances of the 5 shortest constellations take the modulo of the sum and store it in the hashmap
+        let sum: f32 = shortest_constellations.values().sum();
+        let modulo_sum = sum % 1.0; // Assuming you want to take the modulo with 1.0
+        star_fingure_prints.insert(modulo_sum, stars[i].hr);
+
     }
 
     //println!("{:?}", constellations);

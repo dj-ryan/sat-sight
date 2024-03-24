@@ -9,6 +9,7 @@ data = pd.read_csv("star_formated_raw.csv")  # Replace 'your_star_data.csv' with
 # **2. Extract galactic coordinates**
 galactic_lat = data["GLAT"]
 galactic_lon = data["GLON"]
+#star_brightness = data["Vmag"]
 
 # Coordinate Transformation (degrees to radians, then to Cartesian)
 theta = np.radians(galactic_lon)
@@ -26,7 +27,7 @@ fig = go.Figure()
 fig.add_trace(go.Scatter3d(
     x=x, y=y, z=z,
     mode='markers',
-    marker=dict(size=3, color='blue')
+    marker=dict(size=3, color=data["Vmag"]+5)
 ))
 
 # Customize the sphere layout

@@ -16,7 +16,7 @@ struct Star {
     lat: f32, // latitude
     lon: f32, // longitude
     mag: f32, // Magnitude
-    fingure_print: f64 // Hashed fingerprint of the star
+    fingure_print: u32 // Hashed fingerprint of the star
 }
 
 
@@ -38,6 +38,7 @@ fn calculate_distance(star1: &Star, star2: &Star) -> f32 {
 
     distance
 }
+
 
 fn main() -> Result<(), Box<dyn Error>> {
     let file_path = Path::new("C:/Users/golia/Development/sat-sight/data/star_formated_raw_short.csv");

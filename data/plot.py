@@ -12,13 +12,13 @@ galactic_lon = data["GLON"]
 #star_brightness = data["Vmag"]
 
 # Coordinate Transformation (degrees to radians, then to Cartesian)
-theta = np.radians(galactic_lon)
-phi = np.radians(90 - galactic_lat)  # Adjust for latitude convention
+theta = np.radians(galactic_lat)
+phi = np.radians(galactic_lon)  # Adjust for latitude convention
 
-radius = 1 
-x = radius * np.sin(phi) * np.cos(theta)
-y = radius * np.sin(phi) * np.sin(theta)
-z = radius * np.cos(phi)
+radius = 10 
+x = radius * np.cos(theta) * np.cos(phi)
+y = radius * np.cos(theta) * np.sin(phi)
+z = radius * np.sin(theta)
 
 # Create the Plotly figure
 fig = go.Figure()

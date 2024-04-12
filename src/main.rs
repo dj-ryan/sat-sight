@@ -15,7 +15,7 @@ use crate::star_print::Star;
 
 const IMAGE_SIZE: f32 = 648.0; // image is square
 const UNIVERSE_RADIUS: f32 = 10.0; // meters
-const ORTHOGONAL_WIDTH: f32 = 3.527; // meters
+const ORTHOGONAL_WIDTH: f32 = 3.473; // meters
 const VIEWPORT_DEG: f32 = 20.00255; // ((ORTHOGONAL_WIDTH / 2.0) / UNIVERSE_RADIUS).atan().to_degrees() * 2.0;
 const PIXEL_DEG: f32 = VIEWPORT_DEG / IMAGE_SIZE;
 
@@ -92,7 +92,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let img = image::open(
         //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-200730_[-0_0].png",
         //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
-        "C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
+        "C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
     )?;
     let img = img.grayscale(); // Convert to grayscale
     let img: GrayImage = img.into_luma8();
@@ -101,17 +102,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let stars = get_stars_from_image(&img)?;
     println!("Total number of stars: {}", stars.len());
     let star_with_finger_print = star_print::calculate_fingure_print(stars);
-    print!("{:#?}", star_with_finger_print);
+    //print!("{:#?}", star_with_finger_print);
 
 
-    // Calculate fingureprints for stars
+    // // Calculate fingureprints for stars
     // let csv_file =
     //     open_file("C:/Users/golia/Development/sat-sight/data/star_formated_raw.csv")?;
     // let stars: Vec<Star> = parse_star_data(csv_file)?;
     // let stars_with_fingure_prints = calculate_fingure_print(stars);
     // // print!("{:#?}", stars_with_fingure_prints);
 
-    // let mut writer = csv::Writer::from_path("output.csv")?;
+    // let mut writer = csv::Writer::from_path("./calc/output_long.csv")?;
     // for star in stars_with_fingure_prints {
     //     writer.serialize(star)?;
     // }

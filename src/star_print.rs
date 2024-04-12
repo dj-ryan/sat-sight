@@ -15,8 +15,7 @@ use serde::Serialize;
  * print!("{:#?}", stars_with_fingure_prints);
  */
 
-#[derive(Clone, Debug)]
-#[derive(Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Star {
     pub hr: u32,            // Harvard Revised Number
     pub lat: f32,           // latitude
@@ -43,6 +42,22 @@ pub fn calculate_distance(star1: &Star, star2: &Star) -> f32 {
     let distance = earth_radius * c;
 
     distance
+}
+
+pub fn calculate_baring(star1: &Star, star2: &Star) -> f32 {
+    let lat1_rad = star1.lat.to_radians();
+    let lon1_rad = star1.lon.to_radians();
+    let lat2_rad = star2.lat.to_radians();
+    let lon2_rad = star2.lon.to_radians();
+
+    let delta_lon = lon2_rad - lon1_rad;
+
+    let y = delta_lon.sin() * lat2_rad.cos();
+    let x = lat1_rad.cos() * lat2_rad.sin() - lat1_rad.sin() * lat2_rad.cos() * delta_lon.cos();
+
+    let baring = y.atan2(x).to_degrees();
+
+    baring
 }
 
 pub fn open_file(file_path: &str) -> Result<File, Box<dyn Error>> {
@@ -92,7 +107,6 @@ pub fn parse_star_data(file: File) -> Result<Vec<Star>, Box<dyn Error>> {
 pub fn calculate_fingure_print(stars: Vec<Star>) -> Vec<Star> {
     // let mut star_fingure_prints = HashMap::new();
     let mut stars_with_fingure_prints: Vec<Star> = Vec::new();
-
     for i in 0..stars.len() {
         let mut shortest_constellations = HashMap::new();
         for j in 0..stars.len() {
@@ -116,16 +130,34 @@ pub fn calculate_fingure_print(stars: Vec<Star>) -> Vec<Star> {
                 }
             }
         }
-        // Sum the distances of the 5 shortest constellations take the modulo of the sum and store it in the hashmap
-        let sum: f32 = shortest_constellations.values().sum();
+        // calculate the baring of the each of the 5 shortest stars
+
+        let mut baring_collection = Vec::new();
+        let mut baring_sum = 0.0;
+        for (star, _) in &shortest_constellations {
+            let baring = calculate_baring(&stars[i], &stars[stars.iter().position(|x| x.hr == *star).unwrap()]);
+            baring_collection.push(baring+180.0);
+            baring_collection.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            // calculate the difference between the baring of the stars
+            //print!("baring length: {}, ", baring_collection.len());  
+        }
+        for i in 0..(baring_collection.len() - 1) {
+            let difference = baring_collection[i+1] - baring_collection[i];
+            //println!("difference: {}", difference);
+            baring_sum += difference;
+        }
+        
+        let distance_sum: f32 = shortest_constellations.values().sum();
+        println!("Star: {}, print: {}", stars[i].hr, distance_sum + baring_sum);
         // println!("star: {}, shortest_constellations: {:?}", stars[i].hr, shortest_constellations);
         stars_with_fingure_prints.push(Star {
             hr: stars[i].hr,
             lat: stars[i].lat,
             lon: stars[i].lon,
             mag: stars[i].mag,
-            fingure_print: sum,
+            fingure_print: baring_sum + distance_sum,
         });
+
         // let modulo_sum = sum % 1.0; // Assuming you want to take the modulo with 1.0
         // star_fingure_prints.insert(modulo_sum, stars[i].hr);
     }

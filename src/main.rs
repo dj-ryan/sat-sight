@@ -114,6 +114,19 @@ fn extract_lat_lon_tuples(stars: &[Star]) -> Vec<(u32, u32)> {
         .collect() // Collect into a vector
 }
 
+fn get_viewable_stars(fov: f32, looking_direction: (f32, f32), stars: Vec<Star>) -> Vec<Star> {
+    let mut viewable_stars: Vec<Star> = Vec::new();
+    for star in stars {
+        let star_direction = (star.lat, star.lon);
+        let angle_x = (star_direction.0 - looking_direction.0).abs();
+        let angle_y = (star_direction.1 - looking_direction.1).abs();
+        if angle_x <= fov && angle_y <= fov {
+            viewable_stars.push(star);
+        }
+    }
+    viewable_stars
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // Open the image (replace with your path)
     let img_copy = ImageReader::open(

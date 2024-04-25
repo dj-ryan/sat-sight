@@ -164,6 +164,20 @@ viewable_stars
 fn main() -> Result<(), Box<dyn Error>> {
     
 
+        // Open the image (replace with your path)
+    let img_copy = ImageReader::open(
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-200730_[-0_0].png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
+        "C:/Users/golia/Development/sat-sight/data/screenshots/image_00029.png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshots/Unsharped_eye.jpg"
+    )?
+    .decode()?;
+
+    let img_copy = img_copy.grayscale();
+    let img_copy = img_copy.blur(2.0);
+
     let csv_file =
     open_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova.csv")?;
     let stars: Vec<Star> = parse_star_data(csv_file)?;
@@ -179,7 +193,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
 
-
+    let mut good_images = Vec::new();
     let mut star_frames = 0;
     for i in -90..90 { // Lambda
         for j in 0..360 { // Phi
@@ -187,16 +201,27 @@ fn main() -> Result<(), Box<dyn Error>> {
             let viewable_stars = get_viewable_stars(50.0, looking_direction, star_vectors.clone(), stars.clone());
             if viewable_stars.len() > 0 {
                 star_frames += 1;
-                println!("Looking direction: {}, {} - Viewable stars: {:#?}", i, j, viewable_stars.len());
+                // println!("Looking direction: {}, {} - Viewable stars: {:#?}", i, j, viewable_stars.len());
+                let star_cords = extract_lat_lon_tuples(&viewable_stars);
+
+                let goodnes_score = sum_pixel_values(&img_copy.clone().into_luma8(), &star_cords);
+                //println!("Goodness Score: {:#?}", goodnes_score);
+                println!("Looking direction: {}, {} - Viewable stars: {:#?} - Goodness Score: {:#?}", i, j, viewable_stars.len(), goodnes_score);
+                good_images.push((i, j, goodnes_score));
             }
         }
     }
 
+    let mut writer = csv::Writer::from_path("C:/Users/golia/Development/sat-sight/data/calc_output/output_img29_small.csv")?;
+    for data_point in good_images {
+        writer.serialize(data_point)?;
+    }
+
+
     println!("Total frames with stars: {:#?}", star_frames);
 
 
-
-    
+ 
     // ======================================== Open image and compare to other images using fuzzy method
     
     // // Open the image (replace with your path)

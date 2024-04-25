@@ -86,13 +86,13 @@ pub fn parse_star_data(file: File) -> Result<Vec<Star>, Box<dyn Error>> {
         if let Some(hr) = record.get(0) {
             star.hr = hr.parse().unwrap();
         }
-        if let Some(lat) = record.get(4) {
+        if let Some(lat) = record.get(2) {
             star.lat = lat.parse().unwrap();
         }
-        if let Some(lon) = record.get(3) {
+        if let Some(lon) = record.get(1) {
             star.lon = lon.parse().unwrap();
         }
-        if let Some(mag) = record.get(5) {
+        if let Some(mag) = record.get(3) {
             star.mag = mag.parse().unwrap();
         }
         // if let Some(fingure_print) = record.get(6) {

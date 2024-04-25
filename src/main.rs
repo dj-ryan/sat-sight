@@ -7,6 +7,7 @@ use std::error::Error;
 use std::f32;
 
 use std::fs;
+use std::hash::Hash;
 
 // use image::{self, imageops::*}
 
@@ -114,69 +115,139 @@ fn extract_lat_lon_tuples(stars: &[Star]) -> Vec<(u32, u32)> {
         .collect() // Collect into a vector
 }
 
-fn get_viewable_stars(fov: f32, looking_direction: (f32, f32), stars: Vec<Star>) -> Vec<Star> {
-    let mut viewable_stars: Vec<Star> = Vec::new();
-    for star in stars {
-        let star_direction = (star.lat, star.lon);
-        let angle_x = (star_direction.0 - looking_direction.0).abs();
-        let angle_y = (star_direction.1 - looking_direction.1).abs();
-        if angle_x <= fov && angle_y <= fov {
-            viewable_stars.push(star);
+// Helper: Convert (latitude, longitude) to a unit vector
+fn lat_lon_to_vector(lat_lon: (f32, f32)) -> (f32, f32, f32) {
+    let lat_rad = lat_lon.0.to_radians();
+    let lon_rad = lat_lon.1.to_radians();
+
+    let x = lat_rad.cos() * lon_rad.cos();
+    let y = lat_rad.cos() * lon_rad.sin();
+    let z = lat_rad.sin();
+
+    (x, y, z)
+}
+
+// Helper: Calculate angle between two 3D vectors
+fn angle_between(v1: (f32, f32, f32), v2: (f32, f32, f32)) -> f32 {
+    let dot_product = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2;
+    let magnitudes = (v1.0 * v1.0 + v1.1 * v1.1 + v1.2 * v1.2).sqrt()
+        * (v2.0 * v2.0 + v2.1 * v2.1 + v2.2 * v2.2).sqrt();
+
+    (dot_product / magnitudes).acos().to_degrees() 
+}
+
+fn get_viewable_stars(fov: f32, looking_direction: (f32, f32), star_vec: Vec<(f32, f32, f32)>, stars: Vec<Star>) -> Vec<Star> {
+
+    let mut viewable_stars = Vec::new();
+    let direction_vector = lat_lon_to_vector(looking_direction);
+
+    let mut i = 0;
+    for star in &stars {
+        // 1. Convert coordinates to 3D Cartesian vectors
+        // let target_star = (star.lat, star.lon);
+        // let target_vector = lat_lon_to_vector(target_star);
+
+
+        // 2. Calculate angle between the vectors
+        let angle = angle_between(direction_vector, star_vec[i]);
+
+        // 3. Compare against half-FOV
+        if angle <= (fov / 2.0) {
+            viewable_stars.push(star.clone());
         }
+        i += 1;
     }
-    viewable_stars
+
+viewable_stars
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Open the image (replace with your path)
-    let img_copy = ImageReader::open(
-        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-200730_[-0_0].png",
-        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
-        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
-        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
-        "C:/Users/golia/Development/sat-sight/data/screenshots/image_00029.png",
-        //"C:/Users/golia/Development/sat-sight/data/screenshots/Unsharped_eye.jpg"
-    )?
-    .decode()?;
+    
 
-    let img_copy = img_copy.grayscale();
-    let img_copy = img_copy.blur(5.0);
+    let csv_file =
+    open_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova.csv")?;
+    let stars: Vec<Star> = parse_star_data(csv_file)?;
+    
+    // loop through all veiwing driections using a step of 1 degree 
+    // for each direction calculate the viewable stars
 
-    let image_dir = "C:/Users/golia/Development/sat-sight/data/screenshots/images";
+    let mut star_vectors = Vec::new();
 
-    for entry in fs::read_dir(image_dir).expect("Failed to read directory") {
-        let entry = entry.expect("Failed to read directory entry");
-        let path = entry.path();
+    for star in stars.clone() {
+        let star_vector = lat_lon_to_vector((star.lat, star.lon));
+        star_vectors.push(star_vector);
+    }
 
-        if path.is_file() && path.extension().unwrap_or_default() == "png" {
-            // Adjust extension if needed
-            let image_index = path
-                .file_stem()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .split('_')
-                .last()
-                .unwrap()
-                .parse::<u32>()
-                .unwrap();
 
-            if image_index >= 0 && image_index <= 5 {
-                //process_image(&path);
-                print!("{:#?} - ", image_index);
-                let image = ImageReader::open("C:/Users/golia/Development/sat-sight/data/screenshots/image_00029_shifted.png")?
-                .decode()?;
-                let image = image.grayscale();
-                let star_list = get_stars_from_image(&image.into_luma8())?;
-                let star_cords = extract_lat_lon_tuples(&star_list);
-                print!("Total Stars: {:#?} - ", star_list.len());
-                let goodnes_score = sum_pixel_values(&img_copy.clone().into_luma8(), &star_cords);
-                println!("Goodness Score: {:#?}", goodnes_score);
+
+    let mut star_frames = 0;
+    for i in -90..90 { // Lambda
+        for j in 0..360 { // Phi
+            let looking_direction = (i as f32, j as f32);
+            let viewable_stars = get_viewable_stars(50.0, looking_direction, star_vectors.clone(), stars.clone());
+            if viewable_stars.len() > 0 {
+                star_frames += 1;
+                println!("Looking direction: {}, {} - Viewable stars: {:#?}", i, j, viewable_stars.len());
             }
         }
     }
 
-    //=======================================================
+    println!("Total frames with stars: {:#?}", star_frames);
+
+
+
+    
+    // ======================================== Open image and compare to other images using fuzzy method
+    
+    // // Open the image (replace with your path)
+    // let img_copy = ImageReader::open(
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-200730_[-0_0].png",
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
+    //     "C:/Users/golia/Development/sat-sight/data/screenshots/image_00029.png",
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshots/Unsharped_eye.jpg"
+    // )?
+    // .decode()?;
+
+    // let img_copy = img_copy.grayscale();
+    // let img_copy = img_copy.blur(5.0);
+
+    // let image_dir = "C:/Users/golia/Development/sat-sight/data/screenshots/images";
+
+    // for entry in fs::read_dir(image_dir).expect("Failed to read directory") {
+    //     let entry = entry.expect("Failed to read directory entry");
+    //     let path = entry.path();
+
+    //     if path.is_file() && path.extension().unwrap_or_default() == "png" {
+    //         // Adjust extension if needed
+    //         let image_index = path
+    //             .file_stem()
+    //             .unwrap()
+    //             .to_str()
+    //             .unwrap()
+    //             .split('_')
+    //             .last()
+    //             .unwrap()
+    //             .parse::<u32>()
+    //             .unwrap();
+
+    //         if image_index >= 0 && image_index <= 5 {
+    //             //process_image(&path);
+    //             print!("{:#?} - ", image_index);
+    //             let image = ImageReader::open("C:/Users/golia/Development/sat-sight/data/screenshots/image_00029_shifted.png")?
+    //             .decode()?;
+    //             let image = image.grayscale();
+    //             let star_list = get_stars_from_image(&image.into_luma8())?;
+    //             let star_cords = extract_lat_lon_tuples(&star_list);
+    //             print!("Total Stars: {:#?} - ", star_list.len());
+    //             let goodnes_score = sum_pixel_values(&img_copy.clone().into_luma8(), &star_cords);
+    //             println!("Goodness Score: {:#?}", goodnes_score);
+    //         }
+    //     }
+    // }
+
+    //======================================================= Blur and grayscale image
     //img_copy.save("C:/Users/golia/Development/sat-sight/data/screenshots/processed.png")?;
 
     //img.invert();
@@ -187,7 +258,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let grayscale_blur = grayscale.blur(5.0);
     // grayscale_blur.save("C:/Users/golia/Development/sat-sight/data/screenshots/blurred.jpg")?;
 
-    // ========================================
+    // ======================================== Count stars in image
     // let img = img.grayscale(); // Convert to grayscale
     // let img: GrayImage = img.into_luma8();
 
@@ -197,7 +268,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let star_with_finger_print = star_print::calculate_fingure_print(stars);
     //print!("{:#?}", star_with_finger_print);
 
-    // ========================================
+    // ======================================== Calculate all fingureprints based on star data
     // // Calculate fingureprints for stars
     // let csv_file =
     //     open_file("C:/Users/golia/Development/sat-sight/data/star_formated_raw.csv")?;

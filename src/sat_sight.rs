@@ -134,6 +134,8 @@ pub fn open_star_file(file_path: &str) -> Result<File, Box<dyn Error>> {
 }
 
 /// Parses a star file and returns a vector of stars
+/// | HR | Longitude | Latitude | Magnitude |
+/// |----|-----------|----------|-----------|
 pub fn parse_star_file(file: File) -> Result<Vec<Star>, Box<dyn Error>> {
     let mut reader = Reader::from_reader(file);
 

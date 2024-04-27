@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
         //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
         //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
-        "C:/Users/golia/Development/sat-sight/data/screenshots/image_00029.png",
+        "C:/Users/golia/Development/sat-sight/data/screenshots/image_00180.png",
         //"C:/Users/golia/Development/sat-sight/data/screenshots/Unsharped_eye.jpg"
     )?
     .decode()?;
@@ -55,6 +55,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let goodnes_score = pin_prick_image(&img_copy.clone().into_luma8(), &star_cords);
                 //println!("Goodness Score: {:#?}", goodnes_score);
                 println!("Looking direction: {}, {} - Viewable stars: {:#?} - Goodness Score: {:#?}", i, j, viewable_stars.len(), goodnes_score);
+
+                
+
                 good_images.push((i, j, goodnes_score));
             }
         }

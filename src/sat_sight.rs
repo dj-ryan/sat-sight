@@ -239,6 +239,7 @@ pub fn pin_prick_image(image: &GrayImage, coordinates: &Vec<(u32, u32)>) -> u32 
 }
 
 
+
 pub fn calculate_star_fingure_prints(stars: Vec<Star>) -> Vec<Star> {
     // let mut star_fingure_prints = HashMap::new();
     let mut stars_with_fingure_prints: Vec<Star> = Vec::new();

@@ -15,6 +15,8 @@ use serde::Serialize;
 pub const IMAGE_SIZE: f32 = 648.0; // image is square
 pub const FOV: f32 = 15.0; // Field of view of the camera in degrees
 
+use std::f32::consts::PI;
+
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Star {
@@ -79,52 +81,127 @@ pub fn extract_lat_lon_tuples(stars: &[Star]) -> Vec<(u32, u32)> {
         .collect() // Collect into a vector
 }
 
-// Helper: Convert (latitude, longitude) to a unit vector
-pub fn lat_lon_to_vector(lat_lon: (f32, f32)) -> (f32, f32, f32) {
-    let lat_rad = lat_lon.0.to_radians();
-    let lon_rad = lat_lon.1.to_radians();
 
-    let x = lat_rad.cos() * lon_rad.cos();
-    let y = lat_rad.cos() * lon_rad.sin();
-    let z = lat_rad.sin();
-
-    (x, y, z)
-}
-
-// Helper: Calculate angle between two 3D vectors
-fn angle_between_vectors(v1: (f32, f32, f32), v2: (f32, f32, f32)) -> f32 {
-    let dot_product = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2;
-    let magnitudes = (v1.0 * v1.0 + v1.1 * v1.1 + v1.2 * v1.2).sqrt()
-        * (v2.0 * v2.0 + v2.1 * v2.1 + v2.2 * v2.2).sqrt();
-
-    (dot_product / magnitudes).acos().to_degrees() 
-}
 
 /// Returns the viewable stars from a list of stars based on the field of view and looking direction
-pub fn get_viewable_stars(fov: f32, looking_direction: (f32, f32), star_vec: Vec<(f32, f32, f32)>, stars: Vec<Star>) -> Vec<Star> {
+/// pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f32), stars: Vec<Star>) -> Vec<(u32, u32)> {
+pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f32), stars: Vec<Star>) -> Vec<(u32, u32)> {
+    let half_fov = fov.to_radians() / 2.0;
+    let window_center = (window_size as f32 / 2.0, window_size as f32 / 2.0);
 
-    let mut viewable_stars = Vec::new();
-    let direction_vector = lat_lon_to_vector(looking_direction);
+    let looking_direction_rad = (looking_direction.0.to_radians(), looking_direction.1.to_radians());
 
-    let mut i = 0;
-    for star in &stars {
-        // 1. Convert coordinates to 3D Cartesian vectors
-        // let target_star = (star.lat, star.lon);
-        // let target_vector = lat_lon_to_vector(target_star);
+    stars.into_iter()
+        .filter_map(|star| {
+            let star_direction = (star.lat.to_radians(), star.lon.to_radians());
+            let angle_diff = angle_between_directions(looking_direction_rad, star_direction);
 
-
-        // 2. Calculate angle between the vectors
-        let angle = angle_between_vectors(direction_vector, star_vec[i]);
-
-        // 3. Compare against half-FOV
-        if angle <= (fov / 2.0) {
-            viewable_stars.push(star.clone());
-        }
-        i += 1;
-    }
-
-viewable_stars
+            if angle_diff <= half_fov {
+                let (dx, dy) = angle_to_pixel_offset(angle_diff, fov, window_size as f32);
+                let (x, y) = (
+                    (window_center.0 + dx) as u32,
+                    (window_center.1 + dy) as u32,
+                );
+                println!("Star: {}, x: {}, y: {}", star.hr, x, y);
+                Some((x, y))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
+
+pub fn angle_between(lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> f32 {
+    let phi1 = lat1.to_radians();
+    let phi2 = lat2.to_radians();
+    let lambda1 = lon1.to_radians();
+    let lambda2 = lon2.to_radians();
+
+    let delta_phi = phi2 - phi1;
+    let delta_lambda = lambda2 - lambda1;
+
+    let a = (delta_phi / 2.0).sin().powi(2) +
+        phi1.cos() * phi2.cos() * (delta_lambda / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+
+    c
+}
+
+pub fn angle_between_stars(star1: Star, star2: Star) -> f32{
+
+    angle_between(star1.lat, star1.lon, star2.lat, star2.lon)
+}
+
+
+pub fn viewable_stars(looking_direction: (f32, f32), stars: Vec<Star>, fov: f32) -> Vec<Star> {
+    let half_fov = fov.to_radians() / 2.0;
+    //println!("half_fov: {}", half_fov);
+
+    stars.into_iter()
+        .filter_map(|star| {
+            let angle_diff = angle_between(looking_direction.0, looking_direction.1, star.lat, star.lon);
+            if angle_diff <= half_fov {
+                //println!("ang: {}", angle_diff);
+                //convert_between_angle_and_pixel(fov, 720, looking_direction.0, looking_direction.1, star.latitude, star.longitude);
+                Some(star)
+            } else {
+                None
+            }
+        })
+        .collect()
+
+}
+
+pub fn convert_between_angle_and_pixel(fov: f32, screen_size: u32, lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> (u32, u32) {
+    let screen_center = screen_size as f32 / 2.0;
+
+    let pix_ang = screen_size as f32 / fov;
+    let ang_pix = fov / screen_size as f32;
+    //println!("pix_ang: {}, ang_pix: {}", pix_ang, ang_pix);
+
+    let lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
+    let lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
+
+
+    //let lat_delta = lat2 - lat1;
+    //let lon_delta = lon2 - lon1;
+    
+    let px_y = lat_delta * pix_ang;
+    let px_x = lon_delta * pix_ang;
+
+    //println!("lat_delta: {}, lon_delta: {}", lat_delta, lon_delta);
+    println!("px_y: {}, px_x: {}", px_y, px_x);
+
+    let px_y_shfited = px_y as f32 + screen_center;
+    let px_x_shifted = px_x as f32 + screen_center;
+
+    //println!("px_y_shifted: {}, px_x_shifted: {}", px_y_shfited, px_x_shifted);
+    //println!("px_y_shifted u32: {}, px_x_shifted u32: {}", px_y_shfited as u32, px_x_shifted as u32);
+
+    (px_y_shfited as u32, px_x_shifted as u32)
+}
+
+
+pub fn angle_between_directions(dir1: (f32, f32), dir2: (f32, f32)) -> f32 {
+    let (lat1, lon1) = dir1;
+    let (lat2, lon2) = dir2;
+
+    let cos_lat1 = lat1.cos();
+    let cos_lat2 = lat2.cos();
+
+    let part1 = (lon2 - lon1).cos() * cos_lat2;
+    let part2 = lat2.sin() * cos_lat1 - lat1.sin() * cos_lat2 * (lon2 - lon1).cos();
+    part1.atan2(part2).abs()
+}
+
+pub fn angle_to_pixel_offset(angle: f32, fov: f32, window_size: f32) -> (f32, f32) {
+    let ratio = angle / fov;
+    let dx = ratio * window_size / 2.0;
+    let dy = dx * (PI / 4.0).tan();
+    (dx, dy)
+}
+
+
 
 /// Opens a star file and returns a file object
 pub fn open_star_file(file_path: &str) -> Result<File, Box<dyn Error>> {
@@ -166,6 +243,22 @@ pub fn parse_star_file(file: File) -> Result<Vec<Star>, Box<dyn Error>> {
         stars.push(star);
     }
     Ok(stars)
+}
+
+pub fn increase_contrast(image: &mut GrayImage) {
+    // Step 1: Find the minimum and maximum pixel values
+    let (min_pixel, max_pixel) = image.iter().fold((u8::MAX, 0), |(min, max), &pixel| {
+        (min.min(pixel), max.max(pixel))
+    });
+
+    // Step 2: Compute the contrast stretch factor
+    let contrast_factor = 255.0 / f64::from(max_pixel - min_pixel);
+
+    // Step 3: Apply the contrast stretch to each pixel
+    for pixel in image.iter_mut() {
+        // Calculate the new pixel value after applying the contrast stretch
+        *pixel = (((*pixel as f64 - f64::from(min_pixel)) * contrast_factor) as u8).min(255);
+    }
 }
 
 
@@ -222,12 +315,22 @@ pub fn get_stars_from_image(img: &GrayImage) -> Result<Vec<Star>, Box<dyn Error>
     Ok(stars)
 }
 
+pub fn get_pix(stars: Vec<Star>, fov: f32, screen_size: u32, looking_direction: (f32, f32)) -> Vec<(u32, u32)> {
+    stars.into_iter()
+    .map(|star| 
+        convert_between_angle_and_pixel(fov, screen_size, looking_direction.0, looking_direction.1, star.lat, star.lon)
+        
+    ).collect()
+}
+
+
 /// This function takes an image and tests all locations of possibly star locations
 /// and returns a sum of the values that it tests
 pub fn pin_prick_image(image: &GrayImage, coordinates: &Vec<(u32, u32)>) -> u32 {
     coordinates
         .iter()
         .map(|(x, y)| {
+            //println!("x: {}, y: {}", x, y);
             // Handle potential out-of-bounds coordinates
             if *x < image.width() && *y < image.height() {
                 image.get_pixel(*x, *y)[0] as u32 // Extract the Luma (grayscale) value

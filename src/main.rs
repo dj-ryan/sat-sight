@@ -17,85 +17,85 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // ======================================== Render image with px find
 
-    let csv_file = open_star_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova.csv")?;
+    // let csv_file = open_star_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova.csv")?;
 
-    let stars: Vec<Star> = parse_star_file(csv_file)?;
+    // let stars: Vec<Star> = parse_star_file(csv_file)?;
 
-    let looking_direction = (0.0,90.0);
+    // let looking_direction = (0.0,0.0);
 
-    let viewable_stars = viewable_stars(looking_direction, stars.clone(), FOV);
+    // let viewable_stars = viewable_stars(looking_direction, stars.clone(), FOV);
 
-    let view_pix = get_pix(viewable_stars.clone(), FOV, WINDOW_SIZE, looking_direction);
+    // let view_pix = get_pix(viewable_stars.clone(), FOV, WINDOW_SIZE, looking_direction);
 
-    // create a new image and use the pixel values to draw the stars
-    let mut img = image::GrayImage::new(WINDOW_SIZE, WINDOW_SIZE);
+    // // create a new image and use the pixel values to draw the stars
+    // let mut img = image::GrayImage::new(WINDOW_SIZE, WINDOW_SIZE);
 
-    // println!("Pixel values: {:#?}", view_pix);
+    // // println!("Pixel values: {:#?}", view_pix);
 
-    for pix in view_pix {
-        img.put_pixel(pix.0, pix.1, image::Luma([255]));
-    }
+    // for pix in view_pix {
+    //     img.put_pixel(pix.0, pix.1, image::Luma([255]));
+    // }
 
-    img.save("C:/Users/golia/Development/sat-sight/data/screenshots/rendered.jpg")?;
+    // img.save("C:/Users/golia/Development/sat-sight/data/screenshots/rendered.jpg")?;
 
     // ======================================== Open image and and pin prick image and return goodness score, man created func
 
-    //     // Open the image (replace with your path)
-    // let img = ImageReader::open(
-    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-200730_[-0_0].png",
-    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
-    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
-    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
-    //     "C:/Users/golia/Development/sat-sight/data/screenshots/image_00028.png",
-    //     //"C:/Users/golia/Development/sat-sight/data/screenshots/Unsharped_eye.jpg"
-    // )?
-    // .decode()?;    
+        // Open the image (replace with your path)
+    let img = ImageReader::open(
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-200730_[-0_0].png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
+        "C:/Users/golia/Development/sat-sight/data/screenshots/image_00028.png",
+        //"C:/Users/golia/Development/sat-sight/data/screenshots/Unsharped_eye.jpg"
+    )?
+    .decode()?;    
 
-    // let img_gray = img.grayscale();
-    // let img_gray_blur = img_gray.blur(FUDGE_SIGMA); // in place?
-    // let mut img_gray_blur_luma = img_gray_blur.into_luma8();
-    // increase_contrast(&mut img_gray_blur_luma);
+    let img_gray = img.grayscale();
+    let img_gray_blur = img_gray.blur(FUDGE_SIGMA); // in place?
+    let mut img_gray_blur_luma = img_gray_blur.into_luma8();
+    increase_contrast(&mut img_gray_blur_luma);
 
-    // img_gray_blur_luma.save("C:/Users/golia/Development/sat-sight/data/screenshots/reference.jpg")?;
+    img_gray_blur_luma.save("C:/Users/golia/Development/sat-sight/data/screenshots/reference.jpg")?;
 
-    // let csv_file =
-    // open_star_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova.csv")?;
-    // let stars: Vec<Star> = parse_star_file(csv_file)?;
+    let csv_file =
+    open_star_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova.csv")?;
+    let stars: Vec<Star> = parse_star_file(csv_file)?;
     
-    // // loop through all veiwing driections using a step of 1 degree 
-    // // for each direction calculate the viewable stars
+    // loop through all veiwing driections using a step of 1 degree 
+    // for each direction calculate the viewable stars
 
-    // // let mut star_vectors = Vec::new();
+    // let mut star_vectors = Vec::new();
 
-    // let mut good_images = Vec::new();
-    // let mut star_frames = 0;
-    // for i in -90..90 { // Lambda -90 to 90
-    //     for j in 0..360 { // Phi 0 to 360
-    //         let looking_direction = (i as f32, j as f32);
-    //         let viewable_stars = viewable_stars(looking_direction, stars.clone(), FOV);
-    //         if viewable_stars.len() > 0 {
-    //             star_frames += 1;
-    //             // println!("Looking direction: {}, {} - Viewable stars: {:#?}", i, j, viewable_stars.len());
-    //             //let star_cords = extract_lat_lon_tuples(&viewable_stars);
-    //             let view_pix = get_pix(viewable_stars.clone(), FOV, WINDOW_SIZE, looking_direction);
-    //             let goodnes_score = pin_prick_image(&img_gray_blur_luma.clone(), &view_pix);
-    //             //println!("Goodness Score: {:#?}", goodnes_score);
-    //             println!("Looking direction: {}, {} - Viewable stars: {:#?} - Goodness Score: {:#?}", i, j, viewable_stars.len(), goodnes_score);
+    let mut good_images = Vec::new();
+    let mut star_frames = 0;
+    for i in -90..90 { // Lambda -90 to 90
+        for j in 0..360 { // Phi 0 to 360
+            let looking_direction = (i as f32, j as f32);
+            let viewable_stars = viewable_stars(looking_direction, stars.clone(), FOV);
+            if viewable_stars.len() > 0 {
+                star_frames += 1;
+                // println!("Looking direction: {}, {} - Viewable stars: {:#?}", i, j, viewable_stars.len());
+                //let star_cords = extract_lat_lon_tuples(&viewable_stars);
+                let view_pix = get_pix(viewable_stars.clone(), FOV, WINDOW_SIZE, looking_direction);
+                let goodnes_score = pin_prick_image(&img_gray_blur_luma.clone(), &view_pix);
+                //println!("Goodness Score: {:#?}", goodnes_score);
+                //println!("Looking direction: {}, {} - Viewable stars: {:#?} - Goodness Score: {:#?}", i, j, viewable_stars.len(), goodnes_score);
 
                 
 
-    //             good_images.push((i, j, goodnes_score));
-    //         }
-    //     }
-    // }
+                good_images.push((i, j, goodnes_score));
+            }
+        }
+    }
 
-    // let mut writer = csv::Writer::from_path("C:/Users/golia/Development/sat-sight/data/calc_output/output_img28_fov20_fudge10.csv")?;
-    // for data_point in good_images {
-    //     writer.serialize(data_point)?;
-    // }
+    let mut writer = csv::Writer::from_path("C:/Users/golia/Development/sat-sight/data/calc_output/output_img28_fov20_fudge10.csv")?;
+    for data_point in good_images {
+        writer.serialize(data_point)?;
+    }
 
 
-    // println!("Total frames with stars: {:#?}", star_frames);
+    println!("Total frames with stars: {:#?}", star_frames);
     
     // ======================================== Open image and and pin prick image and return goodness score old func
 

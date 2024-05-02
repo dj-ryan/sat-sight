@@ -159,18 +159,22 @@ pub fn convert_between_angle_and_pixel(fov: f32, screen_size: u32, lat1: f32, lo
     let ang_pix = fov / screen_size as f32;
     //println!("pix_ang: {}, ang_pix: {}", pix_ang, ang_pix);
 
-    let lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
-    let lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
+    //let lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
+    //let lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
 
 
-    //let lat_delta = lat2 - lat1;
-    //let lon_delta = lon2 - lon1;
+    let mut lat_delta = lat2 - lat1;
+    let mut lon_delta = lon2 - lon1;
     
+    lat_delta = (lat_delta + 180.0) % 360.0 - 180.0;
+    lon_delta = (lon_delta + 180.0) % 360.0 - 180.0;
+
+
     let px_y = lat_delta * pix_ang;
     let px_x = lon_delta * pix_ang;
 
     //println!("lat_delta: {}, lon_delta: {}", lat_delta, lon_delta);
-    println!("px_y: {}, px_x: {}", px_y, px_x);
+    //println!("px_y: {}, px_x: {}", px_y, px_x);
 
     let px_y_shfited = px_y as f32 + screen_center;
     let px_x_shifted = px_x as f32 + screen_center;

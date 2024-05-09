@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // ======================================== Render image with px find
 
-    let csv_file = open_star_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova.csv")?;
+    let csv_file = open_star_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova_shifted.csv")?;
 
     let stars: Vec<Star> = parse_star_file(csv_file)?;
 

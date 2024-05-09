@@ -112,46 +112,17 @@ pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f
 }
 
 pub fn angle_between(lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> f32 {
-    // let phi1 = lat1.to_radians();
-    // let phi2 = lat2.to_radians();
-    // let lambda1 = lon1.to_radians();
-    // let lambda2 = lon2.to_radians();
+    let phi1 = lat1.to_radians();
+    let phi2 = lat2.to_radians();
+    let lambda1 = lon1.to_radians();
+    let lambda2 = lon2.to_radians();
 
-    // 1. Convert coordinates to 3D unit vectors
-    let vector1 = lat_lon_to_unit_vector(lat1, lon1);
-    let vector2 = lat_lon_to_unit_vector(lat2, lon2);
+    let delat_lambda = (lambda2 - lambda1).abs();
 
-    // 2. Calculate dot product
-    let dot_product = vector1.0 * vector2.0 + vector1.1 * vector2.1 + vector1.2 * vector2.2;
-
-    // 3. Calculate magnitudes
-    let magnitude1 = vector1.0.powi(2) + vector1.1.powi(2) + vector1.2.powi(2).sqrt();
-    let magnitude2 = vector2.0.powi(2) + vector2.1.powi(2) + vector2.2.powi(2).sqrt();
-
-    // 4. Calculate and return the angle in degrees
-    let theta_radians = (dot_product / (magnitude1 * magnitude2)).acos();
-    theta_radians.to_degrees() 
-    
+    (phi1.sin() * phi2.sin() + phi1.cos() * phi2.cos() * delat_lambda.cos()).acos()
 }
 
-fn lat_lon_to_unit_vector(lat: f32, lon: f32) -> (f32, f32, f32) {
-    let lat_rad = lat.to_radians();
-    let mut lon_shifted = 0.0;
-    if(lon > 180.0){
-        lon_shifted = 360.0 - lon;
-    } else {
-        lon_shifted = lon;
-    }
 
-    
-    let lon_rad = lon_shifted.to_radians();
-
-    let x = lat_rad.cos() * lon_rad.cos();
-    let y = lat_rad.cos() * lon_rad.sin();
-    let z = lat_rad.sin();
-
-    (x, y, z)
-}
 
 pub fn angle_between_stars(star1: Star, star2: Star) -> f32{
 
@@ -169,14 +140,24 @@ pub fn viewable_stars(looking_direction: (f32, f32), stars: Vec<Star>, fov: f32)
             if angle_diff <= half_fov {
                 //println!("ang: {}", angle_diff);
                 //convert_between_angle_and_pixel(fov, 720, looking_direction.0, looking_direction.1, star.latitude, star.longitude);
+                println!("Star: {}, lat: {}, lon: {}", star.hr, star.lat, star.lon);
                 Some(star)
             } else {
                 None
             }
         })
         .collect()
+        
+    }
 
-}
+
+pub fn get_pix(stars: Vec<Star>, fov: f32, screen_size: u32, looking_direction: (f32, f32)) -> Vec<(u32, u32)> {
+        stars.into_iter()
+        .map(|star| 
+            convert_between_angle_and_pixel(fov, screen_size, looking_direction.0, looking_direction.1, star.lat, star.lon)
+            
+        ).collect()
+    }
 
 pub fn convert_between_angle_and_pixel(fov: f32, screen_size: u32, lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> (u32, u32) {
     let screen_center = screen_size as f32 / 2.0;
@@ -191,21 +172,28 @@ pub fn convert_between_angle_and_pixel(fov: f32, screen_size: u32, lat1: f32, lo
     let mut lat_delta = 0.0;
     let mut lon_delta = 0.0;
 
-    let mut lat_delta = lat1 - lat2;
-    let mut lon_delta = lon1 - lon2;  
+    // let mut lat_delta = lat1 - lat2;
+    // let mut lon_delta = lon1 - lon2;  
     
-    // lat_delta = (lat_delta + 180.0) % 360.0 - 180.0; // needs some work, dosn't work for negative long
-    // lon_delta = (lon_delta + 180.0) % 360.0 - 180.0;
+    // // lat_delta = (lat_delta + 180.0) % 360.0 - 180.0; // needs some work, dosn't work for negative long
+    // // lon_delta = (lon_delta + 180.0) % 360.0 - 180.0;
 
     lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
     lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
+    
+
+    // lat_delta = angle_between(lat1,0.0, lat2, 0.0);
+    // lon_delta = angle_between(0.0, lon1, 0.0, lon2);
+
+    // lat_delta = lat_delta.to_degrees();
+    // lon_delta = lon_delta.to_degrees();
 
 
     let px_y = lat_delta * pix_ang;
     let px_x = lon_delta * pix_ang;
 
     //println!("lat_delta: {}, lon_delta: {}", lat_delta, lon_delta);
-    println!("px_y: {}, px_x: {}", px_y, px_x);
+    //println!("px_y: {}, px_x: {}", px_y, px_x);
 
     let px_y_shfited = px_y as f32  + screen_center;
     let px_x_shifted = px_x as f32 + screen_center;
@@ -350,13 +338,6 @@ pub fn get_stars_from_image(img: &GrayImage) -> Result<Vec<Star>, Box<dyn Error>
     Ok(stars)
 }
 
-pub fn get_pix(stars: Vec<Star>, fov: f32, screen_size: u32, looking_direction: (f32, f32)) -> Vec<(u32, u32)> {
-    stars.into_iter()
-    .map(|star| 
-        convert_between_angle_and_pixel(fov, screen_size, looking_direction.0, looking_direction.1, star.lat, star.lon)
-        
-    ).collect()
-}
 
 
 /// This function takes an image and tests all locations of possibly star locations

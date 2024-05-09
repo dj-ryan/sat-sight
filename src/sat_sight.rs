@@ -112,19 +112,45 @@ pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f
 }
 
 pub fn angle_between(lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> f32 {
-    let phi1 = lat1.to_radians();
-    let phi2 = lat2.to_radians();
-    let lambda1 = lon1.to_radians();
-    let lambda2 = lon2.to_radians();
+    // let phi1 = lat1.to_radians();
+    // let phi2 = lat2.to_radians();
+    // let lambda1 = lon1.to_radians();
+    // let lambda2 = lon2.to_radians();
 
-    let delta_phi = phi2 - phi1;
-    let delta_lambda = lambda2 - lambda1;
+    // 1. Convert coordinates to 3D unit vectors
+    let vector1 = lat_lon_to_unit_vector(lat1, lon1);
+    let vector2 = lat_lon_to_unit_vector(lat2, lon2);
 
-    let a = (delta_phi / 2.0).sin().powi(2) +
-        phi1.cos() * phi2.cos() * (delta_lambda / 2.0).sin().powi(2);
-    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+    // 2. Calculate dot product
+    let dot_product = vector1.0 * vector2.0 + vector1.1 * vector2.1 + vector1.2 * vector2.2;
 
-    c
+    // 3. Calculate magnitudes
+    let magnitude1 = vector1.0.powi(2) + vector1.1.powi(2) + vector1.2.powi(2).sqrt();
+    let magnitude2 = vector2.0.powi(2) + vector2.1.powi(2) + vector2.2.powi(2).sqrt();
+
+    // 4. Calculate and return the angle in degrees
+    let theta_radians = (dot_product / (magnitude1 * magnitude2)).acos();
+    theta_radians.to_degrees() 
+    
+}
+
+fn lat_lon_to_unit_vector(lat: f32, lon: f32) -> (f32, f32, f32) {
+    let lat_rad = lat.to_radians();
+    let mut lon_shifted = 0.0;
+    if(lon > 180.0){
+        lon_shifted = 360.0 - lon;
+    } else {
+        lon_shifted = lon;
+    }
+
+    
+    let lon_rad = lon_shifted.to_radians();
+
+    let x = lat_rad.cos() * lon_rad.cos();
+    let y = lat_rad.cos() * lon_rad.sin();
+    let z = lat_rad.sin();
+
+    (x, y, z)
 }
 
 pub fn angle_between_stars(star1: Star, star2: Star) -> f32{
@@ -156,27 +182,32 @@ pub fn convert_between_angle_and_pixel(fov: f32, screen_size: u32, lat1: f32, lo
     let screen_center = screen_size as f32 / 2.0;
 
     let pix_ang = screen_size as f32 / fov;
-    let ang_pix = fov / screen_size as f32;
+    // let ang_pix = fov / screen_size as f32;
     //println!("pix_ang: {}, ang_pix: {}", pix_ang, ang_pix);
 
     //let lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
     //let lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
 
+    let mut lat_delta = 0.0;
+    let mut lon_delta = 0.0;
 
-    let mut lat_delta = lat2 - lat1;
-    let mut lon_delta = lon2 - lon1;
+    let mut lat_delta = lat1 - lat2;
+    let mut lon_delta = lon1 - lon2;  
     
-    lat_delta = (lat_delta + 180.0) % 360.0 - 180.0;
-    lon_delta = (lon_delta + 180.0) % 360.0 - 180.0;
+    // lat_delta = (lat_delta + 180.0) % 360.0 - 180.0; // needs some work, dosn't work for negative long
+    // lon_delta = (lon_delta + 180.0) % 360.0 - 180.0;
+
+    lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
+    lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
 
 
     let px_y = lat_delta * pix_ang;
     let px_x = lon_delta * pix_ang;
 
     //println!("lat_delta: {}, lon_delta: {}", lat_delta, lon_delta);
-    //println!("px_y: {}, px_x: {}", px_y, px_x);
+    println!("px_y: {}, px_x: {}", px_y, px_x);
 
-    let px_y_shfited = px_y as f32 + screen_center;
+    let px_y_shfited = px_y as f32  + screen_center;
     let px_x_shifted = px_x as f32 + screen_center;
 
     //println!("px_y_shifted: {}, px_x_shifted: {}", px_y_shfited, px_x_shifted);

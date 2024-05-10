@@ -15,7 +15,8 @@ use serde::Serialize;
 pub const IMAGE_SIZE: f32 = 648.0; // image is square
 pub const FOV: f32 = 15.0; // Field of view of the camera in degrees
 
-use std::f32::consts::PI;
+use std::f64::consts::PI;
+use std::f32::consts::PI as PI32;
 
 
 #[derive(Clone, Debug, Serialize)]
@@ -26,6 +27,34 @@ pub struct Star {
     pub mag: f32,           // Magnitude
     pub fingure_print: f32, // Hashed fingerprint of the star
 }
+
+
+fn project_astronomical_coords(
+    alpha: f64, delta: f64,
+    alpha0: f64, delta0: f64,
+    scale: f64
+) -> (u32, u32) {
+    // Convert all angles from degrees to radians for trigonometric functions
+    let alpha = alpha.to_radians();
+    let delta = delta.to_radians();
+    let alpha0 = alpha0.to_radians();
+    let delta0 = delta0.to_radians();
+
+    let A = delta.cos() * (alpha - alpha0).cos();
+    let F = scale * (180.0 / PI) / (delta0.sin() * delta.sin() + A * delta0.cos());
+
+    let mut LINE = -F * (delta0.cos() * delta.sin() - A * delta0.sin());
+    let mut SAMPLE = -F * delta.cos() * (alpha - alpha0).sin();
+
+    LINE += 360.0;
+    SAMPLE += 360.0;
+    
+
+    (LINE as u32, SAMPLE as u32)
+}
+
+
+
 
 
 /// Calculates the distance between two stars in kilometers
@@ -152,10 +181,19 @@ pub fn viewable_stars(looking_direction: (f32, f32), stars: Vec<Star>, fov: f32)
 
 
 pub fn get_pix(stars: Vec<Star>, fov: f32, screen_size: u32, looking_direction: (f32, f32)) -> Vec<(u32, u32)> {
+        
+        let scale = screen_size as f32 / fov;
+        
         stars.into_iter()
         .map(|star| 
-            convert_between_angle_and_pixel(fov, screen_size, looking_direction.0, looking_direction.1, star.lat, star.lon)
+            //convert_between_angle_and_pixel(fov, screen_size, looking_direction.0, looking_direction.1, star.lat, star.lon)
             
+            project_astronomical_coords(
+                looking_direction.0 as f64, looking_direction.1 as f64,
+                star.lat as f64, star.lon as f64,
+                scale as f64
+            )
+
         ).collect()
     }
 
@@ -205,6 +243,10 @@ pub fn convert_between_angle_and_pixel(fov: f32, screen_size: u32, lat1: f32, lo
 }
 
 
+
+
+
+
 pub fn angle_between_directions(dir1: (f32, f32), dir2: (f32, f32)) -> f32 {
     let (lat1, lon1) = dir1;
     let (lat2, lon2) = dir2;
@@ -220,7 +262,7 @@ pub fn angle_between_directions(dir1: (f32, f32), dir2: (f32, f32)) -> f32 {
 pub fn angle_to_pixel_offset(angle: f32, fov: f32, window_size: f32) -> (f32, f32) {
     let ratio = angle / fov;
     let dx = ratio * window_size / 2.0;
-    let dy = dx * (PI / 4.0).tan();
+    let dy = dx * (PI32 / 4.0).tan();
     (dx, dy)
 }
 

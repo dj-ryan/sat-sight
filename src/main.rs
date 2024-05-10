@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     //let looking_direction = (-28.7,25.7);
 
-    let looking_direction = (0.0, 0.0);
+    let looking_direction = (0.0, 190.0);
 
     let viewable_stars = viewable_stars(looking_direction, stars.clone(), FOV);
 
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         img.put_pixel(pix.0, pix.1, image::Luma([255]));
     }
 
-    img.save("C:/Users/golia/Development/sat-sight/data/screenshots/rendered.jpg")?;
+    img.save("C:/Users/golia/Development/sat-sight/data/screenshots/rendered.png")?;
 
     // ======================================== Open image and and pin prick image and return goodness score, man created func
 

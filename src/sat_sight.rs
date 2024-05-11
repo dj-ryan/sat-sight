@@ -35,24 +35,62 @@ fn project_astronomical_coords(
     scale: f64
 ) -> (u32, u32) {
     // Convert all angles from degrees to radians for trigonometric functions
-    let alpha = alpha.to_radians();
-    let delta = delta.to_radians();
-    let alpha0 = alpha0.to_radians();
-    let delta0 = delta0.to_radians();
+    // let alpha = alpha.to_radians();
+    // let delta = delta.to_radians();
+    // let alpha0 = alpha0.to_radians();
+    // let delta0 = delta0.to_radians();
+    // //let scale = scale.to_radians();
 
-    let A = delta.cos() * (alpha - alpha0).cos();
-    let F = scale * (180.0 / PI) / (delta0.sin() * delta.sin() + A * delta0.cos());
+    // let A = delta.cos() * (alpha - alpha0).cos();
+    // let F = scale  * (180.0 / PI) / (delta0.sin() * delta.sin() + A * delta0.cos());
 
-    let mut LINE = -F * (delta0.cos() * delta.sin() - A * delta0.sin());
-    let mut SAMPLE = -F * delta.cos() * (alpha - alpha0).sin();
+    // let mut LINE = F * (delta0.cos() * delta.sin() - A * delta0.sin());
+    // let mut SAMPLE = F * delta.cos() * (alpha - alpha0).sin();
 
-    LINE += 360.0;
-    SAMPLE += 360.0;
+    // LINE += 360.0;
+    // SAMPLE += 360.0;
     
 
-    (LINE as u32, SAMPLE as u32)
+    // (LINE as u32, SAMPLE as u32)
+
+    let lambda_a = alpha.to_radians();
+    let phi_a = delta.to_radians();
+    let lambda_b = alpha0.to_radians();
+    let phi_b = delta0.to_radians();
+
+    // let phi_a = alpha.to_radians();
+    // let lambda_a = delta.to_radians();
+    // let phi_b = alpha0.to_radians();
+    // let lambda_b = delta0.to_radians();
+    
+
+    //let scale_scale = 100.0 * scale;
+    
+    let cos_c = (phi_a.sin() * phi_b.sin())
+    + (phi_a.cos() * phi_b.cos() * (lambda_b - lambda_a).cos());
+
+    let mut x = scale * (phi_b.cos() * (lambda_b - lambda_a).sin()) / cos_c;
+    let mut y = scale * ((phi_a.cos() * phi_b.sin() - phi_a.sin() * phi_b.cos() * (lambda_b - lambda_a).cos()) 
+        / cos_c);
+
+
+    x += 360.0;
+    y += 360.0;
+
+    (x as u32, y as u32)
 }
 
+
+pub fn gnomonic_porjection(lambda_view: f64, phi_view: f64, lambda: f64, phi: f64) -> (f64, f64) {
+
+    let cos_c = phi.sin() * phi_view.sin() + phi.cos() * phi_view.cos() * (lambda_view - lambda).cos();
+
+    let x = phi_view.cos() * (lambda_view - lambda).sin() / cos_c;
+    
+    let y = (phi.cos() * phi_view.sin() - phi.sin() * phi_view.cos() * (lambda_view - lambda).cos()) / cos_c;
+
+    (x, y)
+}
 
 
 
@@ -182,8 +220,10 @@ pub fn viewable_stars(looking_direction: (f32, f32), stars: Vec<Star>, fov: f32)
 
 pub fn get_pix(stars: Vec<Star>, fov: f32, screen_size: u32, looking_direction: (f32, f32)) -> Vec<(u32, u32)> {
         
-        let scale = screen_size as f32 / fov;
+        //let scale = screen_size as f32 / fov;
         
+        let scale = 2500;
+
         stars.into_iter()
         .map(|star| 
             //convert_between_angle_and_pixel(fov, screen_size, looking_direction.0, looking_direction.1, star.lat, star.lon)

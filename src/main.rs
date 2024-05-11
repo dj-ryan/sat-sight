@@ -23,20 +23,36 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     //let looking_direction = (-28.7,25.7);
 
-    let looking_direction = (0.0, 190.0);
+    let looking_direction = (90.0, 0.0);
 
     let viewable_stars = viewable_stars(looking_direction, stars.clone(), FOV);
 
+    println!("viewable_stars: {:#?}", viewable_stars.len());
+
     let view_pix = get_pix(viewable_stars.clone(), FOV, WINDOW_SIZE, looking_direction);
+
+    //println!("view_pix: {:#?}", view_pix);
 
     // create a new image and use the pixel values to draw the stars
     let mut img = image::GrayImage::new(WINDOW_SIZE, WINDOW_SIZE);
 
     // println!("Pixel values: {:#?}", view_pix);
+    let mut pix_out_of_bounds = 0;
 
     for pix in view_pix {
-        img.put_pixel(pix.0, pix.1, image::Luma([255]));
-    }
+        if pix.0 < WINDOW_SIZE && pix.1 < WINDOW_SIZE {
+            img.put_pixel(pix.0, pix.1, image::Luma([255]));
+            println!("Pixel: x: {:#?} y: {:#?}", pix.0, pix.1)
+
+        } else {
+            println!("Pixel out of bounds: x: {:#?} y: {:#?}", pix.0, pix.1);
+            pix_out_of_bounds += 1;
+        }
+    };
+
+    println!("Total pixels out of bounds: {:#?}", pix_out_of_bounds);
+    
+
 
     img.save("C:/Users/golia/Development/sat-sight/data/screenshots/rendered.png")?;
 

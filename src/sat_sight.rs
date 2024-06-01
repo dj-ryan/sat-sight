@@ -2,11 +2,14 @@
 //! The `satSight` struct is used to represent the satellite sighting data.
 
 
+
 use csv::Reader;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use image::{self, GrayImage};
+use nalgebra::{Quaternion, Vector3};
+
 
 use std::collections::HashMap;
 use serde::Serialize;
@@ -28,6 +31,49 @@ pub struct Star {
     pub fingure_print: f32, // Hashed fingerprint of the star
 }
 
+pub struct StarVec {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+// ===== Quaternion Math ==========================================================================
+// Functions that perform quaternion math operations
+// ================================================================================================
+
+
+pub fn axis_angle_to_quaternion(axis: Vector3<f64>, theta: f64) -> Quaternion<f64> {
+    let half_theta = theta * 0.5;
+    let sin_half_theta = half_theta.sin();
+    Quaternion::new(
+        half_theta.cos(),
+        axis.x * sin_half_theta,
+        axis.y * sin_half_theta,
+        axis.z * sin_half_theta,
+    )
+}
+
+fn rotate_vector(q: &Quaternion<f64>, v: &Vector3<f64>) -> Vector3<f64> {
+    let qv = Quaternion::new(0.0, v.x, v.y, v.z);
+    let q_conj = q.conjugate();
+    let rotated_qv = q * qv * q_conj;
+    Vector3::new(rotated_qv.i, rotated_qv.j, rotated_qv.k)
+}
+
+pub fn rotate_vectors(axis: Vector3<f64>, theta: f64, vectors: Vec<Vector3<f64>>) -> Vec<Vector3<f64>> {
+    let q = axis_angle_to_quaternion(axis, theta);
+    vectors.into_iter().map(|v| rotate_vector(&q, &v)).collect()
+}
+
+
+
+
+
+
+
+// ==== Gnomonic Projection ========================================================================
+// Functions that perform the gnomonic projection
+// =================================================================================================
 
 fn project_astronomical_coords(
     alpha: f64, delta: f64,
@@ -92,8 +138,160 @@ pub fn gnomonic_porjection(lambda_view: f64, phi_view: f64, lambda: f64, phi: f6
     (x, y)
 }
 
+// === Viewable Stars ==============================================================================
+// Using angle difference and direct mapping
+// =================================================================================================
 
 
+/// Returns the viewable stars from a list of stars based on the field of view and looking direction
+/// pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f32), stars: Vec<Star>) -> Vec<(u32, u32)> {}
+/// DEPRECEATED
+pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f32), stars: Vec<Star>) -> Vec<(u32, u32)> {
+    let half_fov = fov.to_radians() / 2.0;
+    let window_center = (window_size as f32 / 2.0, window_size as f32 / 2.0);
+
+    let looking_direction_rad = (looking_direction.0.to_radians(), looking_direction.1.to_radians());
+
+    stars.into_iter()
+        .filter_map(|star| {
+            let star_direction = (star.lat.to_radians(), star.lon.to_radians());
+            let angle_diff = angle_between_directions(looking_direction_rad, star_direction);
+
+            if angle_diff <= half_fov {
+                let (dx, dy) = angle_to_pixel_offset(angle_diff, fov, window_size as f32);
+                let (x, y) = (
+                    (window_center.0 + dx) as u32,
+                    (window_center.1 + dy) as u32,
+                );
+                println!("Star: {}, x: {}, y: {}", star.hr, x, y);
+                Some((x, y))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub fn angle_between(lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> f32 {
+    let phi1 = lat1.to_radians();
+    let phi2 = lat2.to_radians();
+    let lambda1 = lon1.to_radians();
+    let lambda2 = lon2.to_radians();
+
+    let delat_lambda = (lambda2 - lambda1).abs();
+
+    (phi1.sin() * phi2.sin() + phi1.cos() * phi2.cos() * delat_lambda.cos()).acos()
+}
+
+
+pub fn viewable_stars(looking_direction: (f32, f32), stars: Vec<Star>, fov: f32) -> Vec<Star> {
+    let half_fov = fov.to_radians() / 2.0;
+    //println!("half_fov: {}", half_fov);
+
+    stars.into_iter()
+        .filter_map(|star| {
+            let angle_diff = angle_between(looking_direction.0, looking_direction.1, star.lat, star.lon);
+            if angle_diff <= half_fov {
+                //println!("ang: {}", angle_diff);
+                //convert_between_angle_and_pixel(fov, 720, looking_direction.0, looking_direction.1, star.latitude, star.longitude);
+                println!("Star: {}, lat: {}, lon: {}", star.hr, star.lat, star.lon);
+                Some(star)
+            } else {
+                None
+            }
+        })
+        .collect()
+        
+}
+
+
+pub fn get_pix(stars: Vec<Star>, fov: f32, screen_size: u32, looking_direction: (f32, f32)) -> Vec<(u32, u32)> {
+        
+    //let scale = screen_size as f32 / fov;
+    
+    let scale = 2500;
+
+    stars.into_iter()
+    .map(|star| 
+        //convert_between_angle_and_pixel(fov, screen_size, looking_direction.0, looking_direction.1, star.lat, star.lon)
+        
+        project_astronomical_coords(
+            looking_direction.0 as f64, looking_direction.1 as f64,
+            star.lat as f64, star.lon as f64,
+            scale as f64
+        )
+
+    ).collect()
+}
+
+pub fn convert_between_angle_and_pixel(fov: f32, screen_size: u32, lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> (u32, u32) {
+    let screen_center = screen_size as f32 / 2.0;
+
+    let pix_ang = screen_size as f32 / fov;
+    // let ang_pix = fov / screen_size as f32;
+    //println!("pix_ang: {}, ang_pix: {}", pix_ang, ang_pix);
+
+    //let lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
+    //let lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
+
+    let mut lat_delta = 0.0;
+    let mut lon_delta = 0.0;
+
+    // let mut lat_delta = lat1 - lat2;
+    // let mut lon_delta = lon1 - lon2;  
+    
+    // // lat_delta = (lat_delta + 180.0) % 360.0 - 180.0; // needs some work, dosn't work for negative long
+    // // lon_delta = (lon_delta + 180.0) % 360.0 - 180.0;
+
+    lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
+    lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
+    
+
+    // lat_delta = angle_between(lat1,0.0, lat2, 0.0);
+    // lon_delta = angle_between(0.0, lon1, 0.0, lon2);
+
+    // lat_delta = lat_delta.to_degrees();
+    // lon_delta = lon_delta.to_degrees();
+
+
+    let px_y = lat_delta * pix_ang;
+    let px_x = lon_delta * pix_ang;
+
+    //println!("lat_delta: {}, lon_delta: {}", lat_delta, lon_delta);
+    //println!("px_y: {}, px_x: {}", px_y, px_x);
+
+    let px_y_shfited = px_y as f32  + screen_center;
+    let px_x_shifted = px_x as f32 + screen_center;
+
+    //println!("px_y_shifted: {}, px_x_shifted: {}", px_y_shfited, px_x_shifted);
+    //println!("px_y_shifted u32: {}, px_x_shifted u32: {}", px_y_shfited as u32, px_x_shifted as u32);
+
+    (px_y_shfited as u32, px_x_shifted as u32)
+}
+
+
+pub fn angle_between_directions(dir1: (f32, f32), dir2: (f32, f32)) -> f32 {
+    let (lat1, lon1) = dir1;
+    let (lat2, lon2) = dir2;
+
+    let cos_lat1 = lat1.cos();
+    let cos_lat2 = lat2.cos();
+
+    let part1 = (lon2 - lon1).cos() * cos_lat2;
+    let part2 = lat2.sin() * cos_lat1 - lat1.sin() * cos_lat2 * (lon2 - lon1).cos();
+    part1.atan2(part2).abs()
+}
+
+pub fn angle_to_pixel_offset(angle: f32, fov: f32, window_size: f32) -> (f32, f32) {
+    let ratio = angle / fov;
+    let dx = ratio * window_size / 2.0;
+    let dy = dx * (PI32 / 4.0).tan();
+    (dx, dy)
+}
+
+// ==== Utility Functions ==========================================================================
+// Functions that perform general utility operations
+// =================================================================================================
 
 /// Calculates the distance between two stars in kilometers
 pub fn calculate_distance_between_stars(star1: &Star, star2: &Star) -> f32 {
@@ -149,162 +347,103 @@ pub fn extract_lat_lon_tuples(stars: &[Star]) -> Vec<(u32, u32)> {
 }
 
 
-
-/// Returns the viewable stars from a list of stars based on the field of view and looking direction
-/// pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f32), stars: Vec<Star>) -> Vec<(u32, u32)> {
-pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f32), stars: Vec<Star>) -> Vec<(u32, u32)> {
-    let half_fov = fov.to_radians() / 2.0;
-    let window_center = (window_size as f32 / 2.0, window_size as f32 / 2.0);
-
-    let looking_direction_rad = (looking_direction.0.to_radians(), looking_direction.1.to_radians());
-
-    stars.into_iter()
-        .filter_map(|star| {
-            let star_direction = (star.lat.to_radians(), star.lon.to_radians());
-            let angle_diff = angle_between_directions(looking_direction_rad, star_direction);
-
-            if angle_diff <= half_fov {
-                let (dx, dy) = angle_to_pixel_offset(angle_diff, fov, window_size as f32);
-                let (x, y) = (
-                    (window_center.0 + dx) as u32,
-                    (window_center.1 + dy) as u32,
-                );
-                println!("Star: {}, x: {}, y: {}", star.hr, x, y);
-                Some((x, y))
+/// This function takes an image and tests all locations of possibly star locations
+/// and returns a sum of the values that it tests
+pub fn pin_prick_image(image: &GrayImage, coordinates: &Vec<(u32, u32)>) -> u32 {
+    coordinates
+        .iter()
+        .map(|(x, y)| {
+            //println!("x: {}, y: {}", x, y);
+            // Handle potential out-of-bounds coordinates
+            if *x < image.width() && *y < image.height() {
+                image.get_pixel(*x, *y)[0] as u32 // Extract the Luma (grayscale) value
             } else {
-                None
+                0 // Default value if the coordinate is out-of-bounds
             }
         })
-        .collect()
-}
-
-pub fn angle_between(lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> f32 {
-    let phi1 = lat1.to_radians();
-    let phi2 = lat2.to_radians();
-    let lambda1 = lon1.to_radians();
-    let lambda2 = lon2.to_radians();
-
-    let delat_lambda = (lambda2 - lambda1).abs();
-
-    (phi1.sin() * phi2.sin() + phi1.cos() * phi2.cos() * delat_lambda.cos()).acos()
+        .sum()
 }
 
 
 
-pub fn angle_between_stars(star1: Star, star2: Star) -> f32{
 
-    angle_between(star1.lat, star1.lon, star2.lat, star2.lon)
-}
-
-
-pub fn viewable_stars(looking_direction: (f32, f32), stars: Vec<Star>, fov: f32) -> Vec<Star> {
-    let half_fov = fov.to_radians() / 2.0;
-    //println!("half_fov: {}", half_fov);
-
-    stars.into_iter()
-        .filter_map(|star| {
-            let angle_diff = angle_between(looking_direction.0, looking_direction.1, star.lat, star.lon);
-            if angle_diff <= half_fov {
-                //println!("ang: {}", angle_diff);
-                //convert_between_angle_and_pixel(fov, 720, looking_direction.0, looking_direction.1, star.latitude, star.longitude);
-                println!("Star: {}, lat: {}, lon: {}", star.hr, star.lat, star.lon);
-                Some(star)
-            } else {
-                None
+pub fn calculate_star_fingure_prints(stars: Vec<Star>) -> Vec<Star> {
+    // let mut star_fingure_prints = HashMap::new();
+    let mut stars_with_fingure_prints: Vec<Star> = Vec::new();
+    for i in 0..stars.len() {
+        let mut shortest_constellations = HashMap::new();
+        for j in 0..stars.len() {
+            if i != j {
+                let distance = calculate_distance_between_stars(&stars[i], &stars[j]);
+                if shortest_constellations.len() < 5 {
+                    shortest_constellations.insert(stars[j].hr, distance);
+                } else {
+                    let mut max_distance = 0.0;
+                    let mut max_distance_star = 0;
+                    for (star, dist) in &shortest_constellations {
+                        if *dist > max_distance {
+                            max_distance = *dist;
+                            max_distance_star = *star;
+                        }
+                    }
+                    if distance < max_distance {
+                        shortest_constellations.remove(&max_distance_star);
+                        shortest_constellations.insert(stars[j].hr, distance);
+                    }
+                }
             }
-        })
-        .collect()
+        }
+        // calculate the baring of the each of the 5 shortest stars
+
+        let mut baring_collection = Vec::new();
+        let mut baring_sum = 0.0;
+        for (star, _) in &shortest_constellations {
+            let baring = calculate_baring_between_stars(&stars[i], &stars[stars.iter().position(|x| x.hr == *star).unwrap()]);
+            baring_collection.push(baring+180.0);
+            baring_collection.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            // calculate the difference between the baring of the stars
+            //print!("baring length: {}, ", baring_collection.len());  
+        }
+        for i in 0..(baring_collection.len() - 1) {
+            let difference = baring_collection[i+1] - baring_collection[i];
+            //println!("difference: {}", difference);
+            baring_sum += difference;
+        }
         
+        let distance_sum: f32 = shortest_constellations.values().sum();
+        println!("Star: {}, print: {}", stars[i].hr, distance_sum + baring_sum);
+        // println!("star: {}, shortest_constellations: {:?}", stars[i].hr, shortest_constellations);
+        stars_with_fingure_prints.push(Star {
+            hr: stars[i].hr,
+            lat: stars[i].lat,
+            lon: stars[i].lon,
+            mag: stars[i].mag,
+            fingure_print: baring_sum + distance_sum,
+        });
+
+        // let modulo_sum = sum % 1.0; // Assuming you want to take the modulo with 1.0
+        // star_fingure_prints.insert(modulo_sum, stars[i].hr);
     }
-
-
-pub fn get_pix(stars: Vec<Star>, fov: f32, screen_size: u32, looking_direction: (f32, f32)) -> Vec<(u32, u32)> {
-        
-        //let scale = screen_size as f32 / fov;
-        
-        let scale = 2500;
-
-        stars.into_iter()
-        .map(|star| 
-            //convert_between_angle_and_pixel(fov, screen_size, looking_direction.0, looking_direction.1, star.lat, star.lon)
-            
-            project_astronomical_coords(
-                looking_direction.0 as f64, looking_direction.1 as f64,
-                star.lat as f64, star.lon as f64,
-                scale as f64
-            )
-
-        ).collect()
-    }
-
-pub fn convert_between_angle_and_pixel(fov: f32, screen_size: u32, lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> (u32, u32) {
-    let screen_center = screen_size as f32 / 2.0;
-
-    let pix_ang = screen_size as f32 / fov;
-    // let ang_pix = fov / screen_size as f32;
-    //println!("pix_ang: {}, ang_pix: {}", pix_ang, ang_pix);
-
-    //let lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
-    //let lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
-
-    let mut lat_delta = 0.0;
-    let mut lon_delta = 0.0;
-
-    // let mut lat_delta = lat1 - lat2;
-    // let mut lon_delta = lon1 - lon2;  
-    
-    // // lat_delta = (lat_delta + 180.0) % 360.0 - 180.0; // needs some work, dosn't work for negative long
-    // // lon_delta = (lon_delta + 180.0) % 360.0 - 180.0;
-
-    lat_delta = 180.0 - ((lat1 - lat2).abs() - 180.0).abs();
-    lon_delta = 180.0 - ((lon1 - lon2).abs() - 180.0).abs();
-    
-
-    // lat_delta = angle_between(lat1,0.0, lat2, 0.0);
-    // lon_delta = angle_between(0.0, lon1, 0.0, lon2);
-
-    // lat_delta = lat_delta.to_degrees();
-    // lon_delta = lon_delta.to_degrees();
-
-
-    let px_y = lat_delta * pix_ang;
-    let px_x = lon_delta * pix_ang;
-
-    //println!("lat_delta: {}, lon_delta: {}", lat_delta, lon_delta);
-    //println!("px_y: {}, px_x: {}", px_y, px_x);
-
-    let px_y_shfited = px_y as f32  + screen_center;
-    let px_x_shifted = px_x as f32 + screen_center;
-
-    //println!("px_y_shifted: {}, px_x_shifted: {}", px_y_shfited, px_x_shifted);
-    //println!("px_y_shifted u32: {}, px_x_shifted u32: {}", px_y_shfited as u32, px_x_shifted as u32);
-
-    (px_y_shfited as u32, px_x_shifted as u32)
+    // star_fingure_prints
+    stars_with_fingure_prints
 }
 
 
-
-
-
-
-pub fn angle_between_directions(dir1: (f32, f32), dir2: (f32, f32)) -> f32 {
-    let (lat1, lon1) = dir1;
-    let (lat2, lon2) = dir2;
-
-    let cos_lat1 = lat1.cos();
-    let cos_lat2 = lat2.cos();
-
-    let part1 = (lon2 - lon1).cos() * cos_lat2;
-    let part2 = lat2.sin() * cos_lat1 - lat1.sin() * cos_lat2 * (lon2 - lon1).cos();
-    part1.atan2(part2).abs()
+pub fn cartesian_to_corrdinates(
+    x: u32,
+    y: u32,
+    image_width: u32,
+    image_height: u32,
+    viewport_deg: f32,
+) -> (f32, f32) {
+    let lat = (y as f32 / image_height as f32) * viewport_deg;
+    let lon = (x as f32 / image_width as f32) * viewport_deg;
+    (lat, lon)
 }
 
-pub fn angle_to_pixel_offset(angle: f32, fov: f32, window_size: f32) -> (f32, f32) {
-    let ratio = angle / fov;
-    let dx = ratio * window_size / 2.0;
-    let dy = dx * (PI32 / 4.0).tan();
-    (dx, dy)
-}
+// ====== Parsing and file functions ===============================================================
+// Functions that process csv and image files
+// =================================================================================================
 
 
 
@@ -344,6 +483,33 @@ pub fn parse_star_file(file: File) -> Result<Vec<Star>, Box<dyn Error>> {
         }
         if let Some(mag) = record.get(3) {
             star.mag = mag.parse().unwrap();
+        }
+        stars.push(star);
+    }
+    Ok(stars)
+}
+
+pub fn parse_star_vec_file(file: File) -> Result<Vec<StarVec>, Box<dyn Error>> {
+    let mut reader = Reader::from_reader(file);
+
+    // Read the CSV records
+    let mut stars: Vec<StarVec> = Vec::new();
+    for result in reader.records() {
+        let record = result?;
+        // Process each record
+        let mut star: StarVec = StarVec {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        if let Some(x) = record.get(0) {
+            star.x = x.parse().unwrap();
+        }
+        if let Some(y) = record.get(1) {
+            star.y = y.parse().unwrap();
+        }
+        if let Some(z) = record.get(2) {
+            star.z = z.parse().unwrap();
         }
         stars.push(star);
     }
@@ -422,95 +588,4 @@ pub fn get_stars_from_image(img: &GrayImage) -> Result<Vec<Star>, Box<dyn Error>
 
 
 
-/// This function takes an image and tests all locations of possibly star locations
-/// and returns a sum of the values that it tests
-pub fn pin_prick_image(image: &GrayImage, coordinates: &Vec<(u32, u32)>) -> u32 {
-    coordinates
-        .iter()
-        .map(|(x, y)| {
-            //println!("x: {}, y: {}", x, y);
-            // Handle potential out-of-bounds coordinates
-            if *x < image.width() && *y < image.height() {
-                image.get_pixel(*x, *y)[0] as u32 // Extract the Luma (grayscale) value
-            } else {
-                0 // Default value if the coordinate is out-of-bounds
-            }
-        })
-        .sum()
-}
 
-
-
-pub fn calculate_star_fingure_prints(stars: Vec<Star>) -> Vec<Star> {
-    // let mut star_fingure_prints = HashMap::new();
-    let mut stars_with_fingure_prints: Vec<Star> = Vec::new();
-    for i in 0..stars.len() {
-        let mut shortest_constellations = HashMap::new();
-        for j in 0..stars.len() {
-            if i != j {
-                let distance = calculate_distance_between_stars(&stars[i], &stars[j]);
-                if shortest_constellations.len() < 5 {
-                    shortest_constellations.insert(stars[j].hr, distance);
-                } else {
-                    let mut max_distance = 0.0;
-                    let mut max_distance_star = 0;
-                    for (star, dist) in &shortest_constellations {
-                        if *dist > max_distance {
-                            max_distance = *dist;
-                            max_distance_star = *star;
-                        }
-                    }
-                    if distance < max_distance {
-                        shortest_constellations.remove(&max_distance_star);
-                        shortest_constellations.insert(stars[j].hr, distance);
-                    }
-                }
-            }
-        }
-        // calculate the baring of the each of the 5 shortest stars
-
-        let mut baring_collection = Vec::new();
-        let mut baring_sum = 0.0;
-        for (star, _) in &shortest_constellations {
-            let baring = calculate_baring_between_stars(&stars[i], &stars[stars.iter().position(|x| x.hr == *star).unwrap()]);
-            baring_collection.push(baring+180.0);
-            baring_collection.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            // calculate the difference between the baring of the stars
-            //print!("baring length: {}, ", baring_collection.len());  
-        }
-        for i in 0..(baring_collection.len() - 1) {
-            let difference = baring_collection[i+1] - baring_collection[i];
-            //println!("difference: {}", difference);
-            baring_sum += difference;
-        }
-        
-        let distance_sum: f32 = shortest_constellations.values().sum();
-        println!("Star: {}, print: {}", stars[i].hr, distance_sum + baring_sum);
-        // println!("star: {}, shortest_constellations: {:?}", stars[i].hr, shortest_constellations);
-        stars_with_fingure_prints.push(Star {
-            hr: stars[i].hr,
-            lat: stars[i].lat,
-            lon: stars[i].lon,
-            mag: stars[i].mag,
-            fingure_print: baring_sum + distance_sum,
-        });
-
-        // let modulo_sum = sum % 1.0; // Assuming you want to take the modulo with 1.0
-        // star_fingure_prints.insert(modulo_sum, stars[i].hr);
-    }
-    // star_fingure_prints
-    stars_with_fingure_prints
-}
-
-
-pub fn cartesian_to_corrdinates(
-    x: u32,
-    y: u32,
-    image_width: u32,
-    image_height: u32,
-    viewport_deg: f32,
-) -> (f32, f32) {
-    let lat = (y as f32 / image_height as f32) * viewport_deg;
-    let lon = (x as f32 / image_width as f32) * viewport_deg;
-    (lat, lon)
-}

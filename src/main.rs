@@ -6,7 +6,7 @@ use std::fs;
 
 mod sat_sight;
 
-use crate::sat_sight::{open_star_file, parse_star_file, Star, get_viewable_stars, pin_prick_image, extract_lat_lon_tuples, viewable_stars, get_pix, increase_contrast, get_stars_from_image};
+use crate::sat_sight::{open_star_file, parse_star_file, Star, get_viewable_stars, pin_prick_image, extract_lat_lon_tuples, viewable_stars, get_pix, increase_contrast, get_stars_from_image, parse_star_vec_file};
 
 const FUDGE_SIGMA: f32 = 10.0;
 const FOV: f32 = 15.0;
@@ -15,55 +15,103 @@ const WINDOW_SIZE: u32 = 720;
 
 fn main() -> Result<(), Box<dyn Error>> {
     
+    // ======================================== Rotate stars using quaternions and project
+
+    let csv_file = open_star_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova_shifted.csv")?;
+
+    let stars = parse_star_file(csv_file)?;
+
+    //let looking_direction = (-28.7,25.7);
+
+    let looking_direction = (0.0, 0.0);
+
+    let viewable_stars = viewable_stars(looking_direction, stars.clone(), FOV);
+
+    println!("viewable_stars: {:#?}", viewable_stars.len());
+
+    let view_pix = get_pix(viewable_stars.clone(), FOV, WINDOW_SIZE, looking_direction);
+
+    //println!("view_pix: {:#?}", view_pix);
+
+
+
+    // create a new image and use the pixel values to draw the stars
+    let mut img = image::GrayImage::new(WINDOW_SIZE, WINDOW_SIZE);
+
+    // println!("Pixel values: {:#?}", view_pix);
+    let mut pix_out_of_bounds = 0;
+
+    for pix in view_pix {
+        if pix.0 < WINDOW_SIZE && pix.1 < WINDOW_SIZE {
+            img.put_pixel(pix.0, pix.1, image::Luma([255]));
+            println!("Pixel: x: {:#?} y: {:#?}", pix.0, pix.1)
+
+        } else {
+            println!("Pixel out of bounds: x: {:#?} y: {:#?}", pix.0, pix.1);
+            pix_out_of_bounds += 1;
+        }
+    };
+
+    println!("Total pixels out of bounds: {:#?}", pix_out_of_bounds);
+    
+
+
+    img.save("C:/Users/golia/Development/sat-sight/data/screenshots/rendered.png")?;
+
+
+
+
+
+
     // ======================================== loop through direcotry and pull star position data
 
-        // Open the image (replace with your path)
-    let img = ImageReader::open(
-        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-200730_[-0_0].png",
-        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
-        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
-        //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
-        "C:/Users/golia/Development/sat-sight/data/screenshots/image_00029.png",
-        //"C:/Users/golia/Development/sat-sight/data/screenshots/Unsharped_eye.jpg"
-    )?
-    .decode()?;
+    //     // Open the image (replace with your path)
+    // let img = ImageReader::open(
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-200730_[-0_0].png",
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-225008_[-23.7499942779541_-34.0000038146973].png",
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-03-29-234525_[-23.4999904632568_3.99999928474426].png",
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshot_2024-04-05-180954_[-11.2500009536743_23.7499980926514].png",
+    //     "C:/Users/golia/Development/sat-sight/data/screenshots/image_00029.png",
+    //     //"C:/Users/golia/Development/sat-sight/data/screenshots/Unsharped_eye.jpg"
+    // )?
+    // .decode()?;
 
-    let img_gray = img.grayscale();
-    let img_gray_blur = img_gray.blur(FUDGE_SIGMA); // in place?
-    let mut img_gray_blur_luma = img_gray_blur.into_luma8();
-    increase_contrast(&mut img_gray_blur_luma);
+    // let img_gray = img.grayscale();
+    // let img_gray_blur = img_gray.blur(FUDGE_SIGMA); // in place?
+    // let mut img_gray_blur_luma = img_gray_blur.into_luma8();
+    // increase_contrast(&mut img_gray_blur_luma);
 
-    let image_dir = "C:/Users/golia/Development/sat-sight/data/screenshots/images";
+    // let image_dir = "C:/Users/golia/Development/sat-sight/data/screenshots/images";
 
-    for entry in fs::read_dir(image_dir).expect("Failed to read directory") {
-        let entry = entry.expect("Failed to read directory entry");
-        let path = entry.path();
+    // for entry in fs::read_dir(image_dir).expect("Failed to read directory") {
+    //     let entry = entry.expect("Failed to read directory entry");
+    //     let path = entry.path();
 
-        if path.is_file() && path.extension().unwrap_or_default() == "png" {
-            // Adjust extension if needed
-            let image_index = path
-                .file_stem()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .split('_')
-                .last()
-                .unwrap()
-                .parse::<u32>()
-                .unwrap();
+    //     if path.is_file() && path.extension().unwrap_or_default() == "png" {
+    //         // Adjust extension if needed
+    //         let image_index = path
+    //             .file_stem()
+    //             .unwrap()
+    //             .to_str()
+    //             .unwrap()
+    //             .split('_')
+    //             .last()
+    //             .unwrap()
+    //             .parse::<u32>()
+    //             .unwrap();
 
-            if image_index >= 0 && image_index <= 5 {
-                //process_image(&path);
-                print!("{:#?} - ", image_index);
-                let image = ImageReader::open("C:/Users/golia/Development/sat-sight/data/screenshots/image_00029_shifted.png")?
-                .decode()?;
-                let image = image.grayscale();
-                let star_list = get_stars_from_image(&image.into_luma8())?;
-                let star_cords = extract_lat_lon_tuples(&star_list);
-                print!("Total Stars: {:#?} - ", star_list.len());
-            }
-        }
-    }
+    //         if image_index >= 0 && image_index <= 5 {
+    //             //process_image(&path);
+    //             print!("{:#?} - ", image_index);
+    //             let image = ImageReader::open("C:/Users/golia/Development/sat-sight/data/screenshots/image_00029_shifted.png")?
+    //             .decode()?;
+    //             let image = image.grayscale();
+    //             let star_list = get_stars_from_image(&image.into_luma8())?;
+    //             let star_cords = extract_lat_lon_tuples(&star_list);
+    //             print!("Total Stars: {:#?} - ", star_list.len());
+    //         }
+    //     }
+    // }
 
     // ======================================== Render image with px find using gnomic projecton
 

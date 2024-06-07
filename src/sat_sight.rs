@@ -66,7 +66,18 @@ pub fn rotate_vectors(axis: Vector3<f64>, theta: f64, vectors: Vec<Vector3<f64>>
 }
 
 
-
+pub fn rotate_star_vec(star_vec: Vec<StarVec>, axis: Vector3<f64>, theta: f64) -> Vec<StarVec> {
+    let q = axis_angle_to_quaternion(axis, theta);
+    star_vec.into_iter().map(|v| {
+        let v = Vector3::new(v.x as f64, v.y as f64, v.z as f64);
+        let rotated_v = rotate_vector(&q, &v);
+        StarVec {
+            x: rotated_v.x as f32,
+            y: rotated_v.y as f32,
+            z: rotated_v.z as f32,
+        }
+    }).collect()
+}
 
 
 
@@ -174,7 +185,7 @@ pub fn get_viewable_stars(fov: f32, window_size: u32, looking_direction: (f32, f
 
 pub fn angle_between(lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> f32 {
     let phi1 = lat1.to_radians();
-    let phi2 = lat2.to_radians();
+    let phi2: f32 = lat2.to_radians();
     let lambda1 = lon1.to_radians();
     let lambda2 = lon2.to_radians();
 
@@ -315,6 +326,14 @@ pub fn calculate_distance_between_stars(star1: &Star, star2: &Star) -> f32 {
     let distance = earth_radius * c;
 
     distance
+}
+
+/// convert a x,y,z vector to a latitude and longitude
+pub fn xyz_to_lat_lon(x: f32, y: f32, z: f32) -> (f32, f32) {
+    let r = (x.powi(2) + y.powi(2) + z.powi(2)).sqrt();
+    let lat = (z / r).asin().to_degrees();
+    let lon = y.atan2(x).to_degrees();
+    (lat, lon)
 }
 
 

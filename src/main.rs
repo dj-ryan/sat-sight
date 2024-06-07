@@ -1,12 +1,13 @@
 use std::error::Error;
 use std::f32;
 use image::io::Reader as ImageReader;
+use sat_sight::rotate_star_vec;
 
 use std::fs;
 
 mod sat_sight;
 
-use crate::sat_sight::{open_star_file, parse_star_file, Star, get_viewable_stars, pin_prick_image, extract_lat_lon_tuples, viewable_stars, get_pix, increase_contrast, get_stars_from_image, parse_star_vec_file};
+use crate::sat_sight::{open_star_file, parse_star_file, Star, get_viewable_stars, pin_prick_image, extract_lat_lon_tuples, viewable_stars, get_pix, increase_contrast, get_stars_from_image, parse_star_vec_file, xyz_to_lat_lon};
 
 const FUDGE_SIGMA: f32 = 10.0;
 const FOV: f32 = 15.0;
@@ -19,13 +20,35 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let csv_file = open_star_file("C:/Users/golia/Development/sat-sight/data/formated/formated_no_nova_shifted.csv")?;
 
-    let stars = parse_star_file(csv_file)?;
+    // let stars = parse_star_file(csv_file)?;
 
+    let stars = parse_star_vec_file(csv_file)?;
+    
     //let looking_direction = (-28.7,25.7);
 
     let looking_direction = (0.0, 0.0);
 
-    let viewable_stars = viewable_stars(looking_direction, stars.clone(), FOV);
+    // create a z axis Vecoor3<f64> variable
+    let z_axis = nalgebra::Vector3::new(0.0, 0.0, 1.0);
+
+    let rotated_stars = rotate_star_vec(stars, z_axis, 10.0);
+
+    // loop through the rotated stars vector and convert the xyz cords to lat lon cords and star structs using xyz_to_lat_lon
+    let mut rotated_star_structs = Vec::new();
+    for star in rotated_stars {
+        let lat_lon = xyz_to_lat_lon(star.x, star.y, star.z);
+        let star_struct = Star {
+            hr: 0,
+            lat: lat_lon.0,
+            lon: lat_lon.1,
+            mag: 0.0,
+            fingure_print: 0.0,
+        };
+        rotated_star_structs.push(star_struct);
+    }
+
+    let viewable_stars = viewable_stars(looking_direction, rotated_star_structs.clone(), FOV);
+
 
     println!("viewable_stars: {:#?}", viewable_stars.len());
 
